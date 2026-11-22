@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CafeGuard — Microsoft Store package description. tools\build-store.ps1 fills in the $...$ values from
+  store-identity.json (Partner Center → your app → Product identity) and AppPaths.Version.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap desktop rescap">
+
+  <Identity Name="$IdentityName$" Publisher="$Publisher$" Version="$Version$" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Cafe Guard</DisplayName>
+    <PublisherDisplayName>$PublisherDisplayName$</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>A loud alarm that protects your laptop while you step away at the café.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="CafeGuard" Executable="CafeGuard.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Cafe Guard"
+        Description="A loud alarm that protects your laptop while you step away at the café."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" ShortName="Cafe Guard" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- Start with Windows (replaces the installer's Run-key entry). Windows turns it on after the first launch;
+             the user can switch it off in Settings → Apps → Startup. -->
+        <desktop:Extension Category="windows.startupTask" Executable="CafeGuard.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="CafeGuardStartup" Enabled="true" DisplayName="Cafe Guard" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- A normal Windows desktop program (tray icon, power and sound settings). -->
+    <rescap:Capability Name="runFullTrust" />
+    <!-- Only for the optional "Hide the lock-screen power button" link: Windows asks the user for permission each time.
+         Needs Microsoft's approval (see docs\store\partner-center-guide.md). If refused, delete this line and resubmit. -->
+    <rescap:Capability Name="allowElevation" />
+  </Capabilities>
+</Package>

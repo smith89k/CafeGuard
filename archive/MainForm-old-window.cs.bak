@@ -1,0 +1,825 @@
+using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Windows.Forms;
+using Microsoft.Win32;
+
+namespace CafeGuard
+{
+    public enum GuardState
+    {
+        Disarmed,
+        Armed,
+        AlarmTriggered
+    }
+
+    public class MainForm : Form
+    {
+        private GuardState _state = GuardState.Disarmed;
+        private string _armedPin = "1234";
+        private AudioDeviceSnapshot? _armedAudioSnapshot;
+        private readonly SirenPlayer _siren = new SirenPlayer();
+        private readonly System.Windows.Forms.Timer _monitorTimer;
+        private readonly System.Windows.Forms.Timer _testSirenTimer;
+        private bool _isWindowsLocked = false;
+        private bool _flashToggle = false;
+        private string _triggerReason = string.Empty;
+
+        // System Tray
+        private readonly NotifyIcon _trayIcon;
+        private readonly ContextMenuStrip _trayMenu;
+        private Icon? _iconDisarmed;
+        private Icon? _iconArmed;
+        private Icon? _iconAlarm;
+
+        // UI Controls
+        private Panel _headerPanel = null!;
+        private Label _statusBadgeLabel = null!;
+        private Label _statusSubLabel = null!;
+        private Label _powerStatusLabel = null!;
+        private Label _audioStatusLabel = null!;
+        private Label _lockScreenStatusLabel = null!;
+
+        // Settings checkboxes
+        private CheckBox _chkAntiMute = null!;
+        private CheckBox _chkHeadphoneTrap = null!;
+        private CheckBox _chkAutoLockOnArm = null!;
+        private CheckBox _chkAutoLockOnTrigger = null!;
+        private CheckBox _chkAutoDisarmOnWinUnlock = null!;
+
+        // PIN & Action Controls
+        private TextBox _txtPin = null!;
+        private Button _btnArmAndLock = null!;
+        private Button _btnArmOnly = null!;
+        private Button _btnDisarm = null!;
+        private Button _btnTestSiren = null!;
+        private Button _btnHideToTray = null!;
+        private ListBox _logBox = null!;
+
+        public MainForm()
+        {
+            Text = "CafeGuard — Laptop Anti-Theft Charger & Lock-Screen Alarm";
+            Size = new Size(620, 720);
+            MinimumSize = new Size(600, 680);
+            StartPosition = FormStartPosition.CenterScreen;
+            BackColor = Color.FromArgb(18, 22, 31);
+            ForeColor = Color.FromArgb(235, 240, 248);
+            Font = new Font("Segoe UI", 9.75f, FontStyle.Regular);
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            MaximizeBox = false;
+
+            CreateDynamicIcons();
+            if (_iconDisarmed != null) Icon = _iconDisarmed;
+
+            // System Tray setup
+            _trayMenu = BuildTrayMenu();
+            _trayIcon = new NotifyIcon
+            {
+                Icon = _iconDisarmed,
+                Text = "CafeGuard: DISARMED",
+                ContextMenuStrip = _trayMenu,
+                Visible = true
+            };
+            _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
+
+            BuildUI();
+
+            // Monitor timer (runs every 150ms, even when Windows Lock Screen is active)
+            _monitorTimer = new System.Windows.Forms.Timer { Interval = 150 };
+            _monitorTimer.Tick += MonitorTimer_Tick;
+            _monitorTimer.Start();
+
+            // 3-second test siren timer
+            _testSirenTimer = new System.Windows.Forms.Timer { Interval = 3000 };
+            _testSirenTimer.Tick += (_, _) =>
+            {
+                _testSirenTimer.Stop();
+                if (_state == GuardState.Disarmed)
+                {
+                    _siren.Stop();
+                    CoreAudioController.RestoreVolume(_armedAudioSnapshot);
+                    Log("Test siren finished (volume restored).");
+                }
+            };
+
+            // Listen for Windows Lock Screen (Win+L) events
+            SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
+
+            Log("CafeGuard initialized. Ready for coffee shop protection.");
+            UpdateTelemetryLabels();
+            UpdateUiState();
+        }
+
+        private void CreateDynamicIcons()
+        {
+            _iconDisarmed = DrawShieldIcon(Color.FromArgb(16, 185, 129)); // Emerald Green
+            _iconArmed = DrawShieldIcon(Color.FromArgb(59, 130, 246));    // Royal Blue
+            _iconAlarm = DrawShieldIcon(Color.FromArgb(239, 68, 68));     // Crimson Red
+        }
+
+        private static Icon DrawShieldIcon(Color fillColor)
+        {
+            using var bmp = new Bitmap(32, 32);
+            using var g = Graphics.FromImage(bmp);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Color.Transparent);
+
+            Point[] shieldPts =
+            {
+                new Point(16, 2),
+                new Point(28, 7),
+                new Point(26, 20),
+                new Point(16, 30),
+                new Point(6, 20),
+                new Point(4, 7)
+            };
+
+            using var brush = new SolidBrush(fillColor);
+            using var pen = new Pen(Color.White, 2f);
+            g.FillPolygon(brush, shieldPts);
+            g.DrawPolygon(pen, shieldPts);
+
+            // Draw lightning bolt inside shield
+            using var boltFont = new Font("Segoe UI", 12f, FontStyle.Bold);
+            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            g.DrawString("⚡", boltFont, Brushes.White, new RectangleF(0, 2, 32, 28), sf);
+
+            return Icon.FromHandle(bmp.GetHicon());
+        }
+
+        private ContextMenuStrip BuildTrayMenu()
+        {
+            var menu = new ContextMenuStrip();
+            var itemArmLock = new ToolStripMenuItem("🔒 Arm & Lock Screen (Going to WC)", null, (_, _) => ArmSystem(lockScreenImmediately: true));
+            var itemArmOnly = new ToolStripMenuItem("🛡️ Arm Alarm Only", null, (_, _) => ArmSystem(lockScreenImmediately: false));
+            var itemTest = new ToolStripMenuItem("🔊 Test Siren (3 Seconds)", null, (_, _) => RunTestSiren());
+            var itemShow = new ToolStripMenuItem("🖥️ Open CafeGuard Dashboard", null, (_, _) => RestoreFromTray());
+            var itemExit = new ToolStripMenuItem("❌ Exit CafeGuard", null, (_, _) =>
+            {
+                if (_state != GuardState.Disarmed)
+                {
+                    RestoreFromTray();
+                    MessageBox.Show(
+                        "CafeGuard is currently ARMED! Enter your PIN to disarm before exiting.",
+                        "CafeGuard Security Lock",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+                ExitApplication();
+            });
+
+            menu.Items.Add(itemArmLock);
+            menu.Items.Add(itemArmOnly);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(itemTest);
+            menu.Items.Add(itemShow);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(itemExit);
+            return menu;
+        }
+
+        private void BuildUI()
+        {
+            // 1. Top Status Banner
+            _headerPanel = new Panel
+            {
+                Location = new Point(16, 16),
+                Size = new Size(572, 96),
+                BackColor = Color.FromArgb(22, 101, 52)
+            };
+
+            _statusBadgeLabel = new Label
+            {
+                Text = "🟢 DISARMED — READY",
+                Font = new Font("Segoe UI", 16f, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(16, 14),
+                Size = new Size(540, 36),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            _statusSubLabel = new Label
+            {
+                Text = "Plug in your charger, set your PIN, and click 'Arm & Lock Screen' before leaving.",
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(220, 252, 231),
+                Location = new Point(16, 52),
+                Size = new Size(540, 32),
+                TextAlign = ContentAlignment.TopCenter
+            };
+
+            _headerPanel.Controls.Add(_statusBadgeLabel);
+            _headerPanel.Controls.Add(_statusSubLabel);
+            Controls.Add(_headerPanel);
+
+            // 2. Live Hardware Telemetry Card
+            var telemetryGroup = new GroupBox
+            {
+                Text = " Live Hardware & Lock-Screen Sensors ",
+                ForeColor = Color.FromArgb(148, 163, 184),
+                BackColor = Color.FromArgb(26, 32, 44),
+                Location = new Point(16, 122),
+                Size = new Size(572, 102)
+            };
+
+            _powerStatusLabel = new Label
+            {
+                Text = "🔌 Power: Checking...",
+                Font = new Font("Segoe UI Semibold", 10f),
+                ForeColor = Color.FromArgb(74, 222, 128),
+                Location = new Point(16, 24),
+                Size = new Size(540, 22)
+            };
+
+            _audioStatusLabel = new Label
+            {
+                Text = "🔊 Audio Endpoint: Checking...",
+                Font = new Font("Segoe UI", 9.5f),
+                ForeColor = Color.FromArgb(226, 232, 240),
+                Location = new Point(16, 48),
+                Size = new Size(540, 22)
+            };
+
+            _lockScreenStatusLabel = new Label
+            {
+                Text = "🔒 Lock Screen Protection: Active (Keep-Awake Shield Ready)",
+                Font = new Font("Segoe UI", 9.5f),
+                ForeColor = Color.FromArgb(125, 211, 252),
+                Location = new Point(16, 72),
+                Size = new Size(540, 22)
+            };
+
+            telemetryGroup.Controls.Add(_powerStatusLabel);
+            telemetryGroup.Controls.Add(_audioStatusLabel);
+            telemetryGroup.Controls.Add(_lockScreenStatusLabel);
+            Controls.Add(telemetryGroup);
+
+            // 3. Anti-Theft Protection Features Group
+            var featuresGroup = new GroupBox
+            {
+                Text = " Anti-Theft Defense Modules ",
+                ForeColor = Color.FromArgb(148, 163, 184),
+                BackColor = Color.FromArgb(26, 32, 44),
+                Location = new Point(16, 232),
+                Size = new Size(572, 152)
+            };
+
+            _chkAntiMute = new CheckBox
+            {
+                Text = "Anti-Mute Max Volume Lock (Forces 100% volume & unmutes every 0.15s)",
+                Checked = true,
+                ForeColor = Color.White,
+                Location = new Point(16, 24),
+                Size = new Size(540, 24)
+            };
+
+            _chkHeadphoneTrap = new CheckBox
+            {
+                Text = "Headphone / Audio-Jack Trap (Triggers siren & forces speaker if headphones plugged)",
+                Checked = true,
+                ForeColor = Color.White,
+                Location = new Point(16, 50),
+                Size = new Size(540, 24)
+            };
+
+            _chkAutoLockOnArm = new CheckBox
+            {
+                Text = "Keep CPU & Audio Awake on Windows Lock Screen (Prevents Sleep while at WC)",
+                Checked = true,
+                ForeColor = Color.White,
+                Location = new Point(16, 76),
+                Size = new Size(540, 24)
+            };
+
+            _chkAutoLockOnTrigger = new CheckBox
+            {
+                Text = "Immediately Lock Windows Screen (Win+L) the instant alarm triggers",
+                Checked = true,
+                ForeColor = Color.White,
+                Location = new Point(16, 102),
+                Size = new Size(540, 24)
+            };
+
+            _chkAutoDisarmOnWinUnlock = new CheckBox
+            {
+                Text = "Also auto-disarm when I unlock Windows (Windows Hello / Password) if no alarm",
+                Checked = false,
+                ForeColor = Color.FromArgb(186, 230, 253),
+                Location = new Point(16, 126),
+                Size = new Size(540, 22)
+            };
+
+            featuresGroup.Controls.Add(_chkAntiMute);
+            featuresGroup.Controls.Add(_chkHeadphoneTrap);
+            featuresGroup.Controls.Add(_chkAutoLockOnArm);
+            featuresGroup.Controls.Add(_chkAutoLockOnTrigger);
+            featuresGroup.Controls.Add(_chkAutoDisarmOnWinUnlock);
+            Controls.Add(featuresGroup);
+
+            // 4. PIN Code & Arm / Disarm Controls
+            var controlGroup = new GroupBox
+            {
+                Text = " Secret PIN & Arm / Disarm Controls ",
+                ForeColor = Color.FromArgb(148, 163, 184),
+                BackColor = Color.FromArgb(26, 32, 44),
+                Location = new Point(16, 392),
+                Size = new Size(572, 146)
+            };
+
+            var lblPin = new Label
+            {
+                Text = "Secret PIN Code:",
+                Font = new Font("Segoe UI Semibold", 10.5f),
+                ForeColor = Color.White,
+                Location = new Point(16, 29),
+                Size = new Size(125, 28)
+            };
+
+            _txtPin = new TextBox
+            {
+                Text = "1234",
+                PasswordChar = '●',
+                Font = new Font("Consolas", 14f, FontStyle.Bold),
+                BackColor = Color.FromArgb(15, 23, 42),
+                ForeColor = Color.FromArgb(56, 189, 248),
+                BorderStyle = BorderStyle.FixedSingle,
+                Location = new Point(145, 25),
+                Size = new Size(130, 32),
+                MaxLength = 12,
+                TextAlign = HorizontalAlignment.Center
+            };
+            _txtPin.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.SuppressKeyPress = true;
+                    if (_state == GuardState.Disarmed)
+                        ArmSystem(lockScreenImmediately: true);
+                    else
+                        TryDisarmWithPin();
+                }
+            };
+
+            _btnDisarm = new Button
+            {
+                Text = "🔓 DISARM ALARM (Enter PIN)",
+                Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                BackColor = Color.FromArgb(220, 38, 38),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(290, 23),
+                Size = new Size(264, 36),
+                Cursor = Cursors.Hand,
+                Enabled = false
+            };
+            _btnDisarm.FlatAppearance.BorderSize = 0;
+            _btnDisarm.Click += (_, _) => TryDisarmWithPin();
+
+            _btnArmAndLock = new Button
+            {
+                Text = "🔒 ARM & LOCK SCREEN (Going to WC)",
+                Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                BackColor = Color.FromArgb(37, 99, 235),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(16, 70),
+                Size = new Size(270, 38),
+                Cursor = Cursors.Hand
+            };
+            _btnArmAndLock.FlatAppearance.BorderSize = 0;
+            _btnArmAndLock.Click += (_, _) => ArmSystem(lockScreenImmediately: true);
+
+            _btnArmOnly = new Button
+            {
+                Text = "🛡️ ARM ONLY (Keep Screen Open)",
+                Font = new Font("Segoe UI", 9.75f, FontStyle.Bold),
+                BackColor = Color.FromArgb(15, 118, 110),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(296, 70),
+                Size = new Size(258, 38),
+                Cursor = Cursors.Hand
+            };
+            _btnArmOnly.FlatAppearance.BorderSize = 0;
+            _btnArmOnly.Click += (_, _) => ArmSystem(lockScreenImmediately: false);
+
+            _btnTestSiren = new Button
+            {
+                Text = "🔊 Test Siren (3s)",
+                Font = new Font("Segoe UI", 9f, FontStyle.Regular),
+                BackColor = Color.FromArgb(51, 65, 85),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(16, 114),
+                Size = new Size(270, 26),
+                Cursor = Cursors.Hand
+            };
+            _btnTestSiren.FlatAppearance.BorderSize = 0;
+            _btnTestSiren.Click += (_, _) => RunTestSiren();
+
+            _btnHideToTray = new Button
+            {
+                Text = "📥 Minimize to System Tray",
+                Font = new Font("Segoe UI", 9f, FontStyle.Regular),
+                BackColor = Color.FromArgb(51, 65, 85),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(296, 114),
+                Size = new Size(258, 26),
+                Cursor = Cursors.Hand
+            };
+            _btnHideToTray.FlatAppearance.BorderSize = 0;
+            _btnHideToTray.Click += (_, _) => MinimizeToTray();
+
+            controlGroup.Controls.Add(lblPin);
+            controlGroup.Controls.Add(_txtPin);
+            controlGroup.Controls.Add(_btnDisarm);
+            controlGroup.Controls.Add(_btnArmAndLock);
+            controlGroup.Controls.Add(_btnArmOnly);
+            controlGroup.Controls.Add(_btnTestSiren);
+            controlGroup.Controls.Add(_btnHideToTray);
+            Controls.Add(controlGroup);
+
+            // 5. Security Event Log
+            var logGroup = new GroupBox
+            {
+                Text = " Security Activity Log ",
+                ForeColor = Color.FromArgb(148, 163, 184),
+                BackColor = Color.FromArgb(26, 32, 44),
+                Location = new Point(16, 546),
+                Size = new Size(572, 122)
+            };
+
+            _logBox = new ListBox
+            {
+                BackColor = Color.FromArgb(15, 23, 42),
+                ForeColor = Color.FromArgb(148, 163, 184),
+                BorderStyle = BorderStyle.None,
+                Font = new Font("Consolas", 9f),
+                Location = new Point(12, 22),
+                Size = new Size(548, 90)
+            };
+
+            logGroup.Controls.Add(_logBox);
+            Controls.Add(logGroup);
+        }
+
+        private void ArmSystem(bool lockScreenImmediately)
+        {
+            if (_state != GuardState.Disarmed) return;
+
+            string pin = _txtPin.Text.Trim();
+            if (pin.Length < 3)
+            {
+                MessageBox.Show(
+                    "Please enter a secret PIN code (at least 3 digits/characters) before arming.",
+                    "PIN Required",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                _txtPin.Focus();
+                return;
+            }
+
+            var power = PowerAndLockService.GetPowerStatus();
+            if (!power.IsPluggedIn)
+            {
+                var res = MessageBox.Show(
+                    "Your laptop charger is currently UNPLUGGED!\n\n" +
+                    "If you arm CafeGuard right now while unplugged, the siren will trigger immediately.\n\n" +
+                    "Do you want to arm anyway (to test the alarm trigger)?",
+                    "Charger Not Plugged In",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (res != DialogResult.Yes) return;
+            }
+
+            _armedPin = pin;
+            _txtPin.Text = string.Empty; // Clear PIN box so nobody can read length
+            _armedAudioSnapshot = CoreAudioController.TakeSnapshot();
+            _triggerReason = string.Empty;
+            _state = GuardState.Armed;
+
+            if (_chkAutoLockOnArm.Checked)
+            {
+                PowerAndLockService.SetKeepAwakeOnLockScreen(true);
+            }
+
+            UpdateUiState();
+            Log($"ARMED protection. Audio locked to: {_armedAudioSnapshot.DefaultDeviceName}.");
+
+            _trayIcon.ShowBalloonTip(
+                2000,
+                "CafeGuard ARMED",
+                "Unplugging the charger or plugging in headphones will trigger the 100% volume siren.",
+                ToolTipIcon.Info);
+
+            if (lockScreenImmediately)
+            {
+                Log("Locking Windows screen (Win+L) for WC break...");
+                PowerAndLockService.LockWorkStation();
+            }
+        }
+
+        private void TriggerAlarm(string reason)
+        {
+            if (_state == GuardState.AlarmTriggered) return;
+
+            _state = GuardState.AlarmTriggered;
+            _triggerReason = reason;
+            Log($"🚨 ALARM TRIGGERED: {reason}");
+
+            // 1. Force 100% volume & unmute immediately
+            if (_chkAntiMute.Checked)
+            {
+                CoreAudioController.EnforceMaxVolumeAndAntiHijack(_armedAudioSnapshot);
+            }
+
+            // 2. Start high-decibel piercing siren
+            _siren.StartLooping();
+
+            // 3. Bring window to front & update UI
+            UpdateUiState();
+
+            // 4. Lock Windows screen if configured and not already locked
+            if (_chkAutoLockOnTrigger.Checked && !_isWindowsLocked)
+            {
+                PowerAndLockService.LockWorkStation();
+            }
+        }
+
+        private void TryDisarmWithPin()
+        {
+            string entered = _txtPin.Text.Trim();
+            if (entered == _armedPin)
+            {
+                DisarmSystem("Correct PIN entered by owner.");
+            }
+            else
+            {
+                _txtPin.Text = string.Empty;
+                _txtPin.Focus();
+                Log("❌ Failed disarm attempt: Wrong PIN entered!");
+                if (_state == GuardState.Armed)
+                {
+                    TriggerAlarm("Wrong PIN entered while armed!");
+                }
+            }
+        }
+
+        private void DisarmSystem(string reason)
+        {
+            _siren.Stop();
+            _state = GuardState.Disarmed;
+            _triggerReason = string.Empty;
+            _txtPin.Text = _armedPin; // Restore PIN for quick re-arming
+            TopMost = false;
+
+            PowerAndLockService.SetKeepAwakeOnLockScreen(false);
+            CoreAudioController.RestoreVolume(_armedAudioSnapshot);
+
+            Log($"🟢 DISARMED: {reason}");
+            UpdateUiState();
+        }
+
+        private void RunTestSiren()
+        {
+            if (_state != GuardState.Disarmed) return;
+            _armedAudioSnapshot = CoreAudioController.TakeSnapshot();
+            Log("🔊 Running 3-second max-volume siren test...");
+            CoreAudioController.EnforceMaxVolumeAndAntiHijack(_armedAudioSnapshot);
+            _siren.StartLooping();
+            _testSirenTimer.Start();
+        }
+
+        private void MonitorTimer_Tick(object? sender, EventArgs e)
+        {
+            UpdateTelemetryLabels();
+
+            if (_state == GuardState.Armed)
+            {
+                // 1. Check if charger was unplugged
+                var power = PowerAndLockService.GetPowerStatus();
+                if (!power.IsPluggedIn)
+                {
+                    TriggerAlarm("AC Charger Unplugged!");
+                    return;
+                }
+
+                // 2. Check Headphone / Audio-Jack Trap
+                if (_chkHeadphoneTrap.Checked && _armedAudioSnapshot != null)
+                {
+                    if (CoreAudioController.HasAudioEndpointChanged(_armedAudioSnapshot, out string audioReason))
+                    {
+                        TriggerAlarm(audioReason);
+                        return;
+                    }
+                }
+            }
+            else if (_state == GuardState.AlarmTriggered)
+            {
+                // Continuously enforce 100% Volume, Unmute, and Anti-Headphone-Hijack every 150ms!
+                if (_chkAntiMute.Checked)
+                {
+                    CoreAudioController.EnforceMaxVolumeAndAntiHijack(_armedAudioSnapshot);
+                }
+
+                // Ensure siren keeps looping
+                if (!_siren.IsPlaying)
+                {
+                    _siren.StartLooping();
+                }
+
+                // Flash banner red/dark-red
+                _flashToggle = !_flashToggle;
+                _headerPanel.BackColor = _flashToggle
+                    ? Color.FromArgb(220, 38, 38)
+                    : Color.FromArgb(127, 29, 29);
+            }
+        }
+
+        private void SystemEvents_SessionSwitch(object sender, SessionSwitchEventArgs e)
+        {
+            if (e.Reason == SessionSwitchReason.SessionLock)
+            {
+                _isWindowsLocked = true;
+                Log("🔒 Windows Lock Screen engaged — CafeGuard monitoring in background.");
+            }
+            else if (e.Reason == SessionSwitchReason.SessionUnlock)
+            {
+                _isWindowsLocked = false;
+                Log("🔓 Windows Screen unlocked.");
+
+                if (_state == GuardState.Armed && _chkAutoDisarmOnWinUnlock.Checked)
+                {
+                    DisarmSystem("Auto-disarmed on owner Windows Unlock.");
+                }
+                else if (_state != GuardState.Disarmed)
+                {
+                    // Pop up disarm window immediately when owner unlocks screen
+                    RestoreFromTray();
+                    TopMost = true;
+                    Activate();
+                    _txtPin.Focus();
+                }
+            }
+        }
+
+        private void UpdateTelemetryLabels()
+        {
+            var power = PowerAndLockService.GetPowerStatus();
+            _powerStatusLabel.Text = $"🔌 Power: {power.StatusText}";
+            _powerStatusLabel.ForeColor = power.IsPluggedIn
+                ? Color.FromArgb(74, 222, 128)
+                : Color.FromArgb(248, 113, 113);
+
+            var audio = CoreAudioController.GetCurrentAudioStatus();
+            string muteTxt = audio.IsMuted ? "MUTED" : $"{audio.VolumePercent}%";
+            _audioStatusLabel.Text = $"🔊 Audio Output: {audio.DeviceName} [Volume: {muteTxt}]";
+
+            string lockState = _isWindowsLocked ? "LOCKED (Guarding)" : "Unlocked (Ready for Win+L)";
+            _lockScreenStatusLabel.Text = $"🔒 Screen State: {lockState} | Sleep-Blocker: {(_state != GuardState.Disarmed ? "ACTIVE" : "Standby")}";
+        }
+
+        private void UpdateUiState()
+        {
+            switch (_state)
+            {
+                case GuardState.Disarmed:
+                    _headerPanel.BackColor = Color.FromArgb(22, 101, 52);
+                    _statusBadgeLabel.Text = "🟢 DISARMED — READY";
+                    _statusSubLabel.Text = "Plug in your charger, set your PIN, and click 'Arm & Lock Screen' before going to WC.";
+                    _btnArmAndLock.Enabled = true;
+                    _btnArmOnly.Enabled = true;
+                    _btnTestSiren.Enabled = true;
+                    _btnDisarm.Enabled = false;
+                    _chkAntiMute.Enabled = true;
+                    _chkHeadphoneTrap.Enabled = true;
+                    _chkAutoLockOnArm.Enabled = true;
+                    _chkAutoLockOnTrigger.Enabled = true;
+                    _chkAutoDisarmOnWinUnlock.Enabled = true;
+                    if (_iconDisarmed != null)
+                    {
+                        Icon = _iconDisarmed;
+                        _trayIcon.Icon = _iconDisarmed;
+                    }
+                    _trayIcon.Text = "CafeGuard: DISARMED";
+                    break;
+
+                case GuardState.Armed:
+                    _headerPanel.BackColor = Color.FromArgb(30, 64, 175);
+                    _statusBadgeLabel.Text = "🛡️ ARMED — GUARDING LAPTOP";
+                    _statusSubLabel.Text = "Monitoring AC Charger & Audio Jack on Lock Screen. Enter PIN to disarm.";
+                    _btnArmAndLock.Enabled = false;
+                    _btnArmOnly.Enabled = false;
+                    _btnTestSiren.Enabled = false;
+                    _btnDisarm.Enabled = true;
+                    _chkAntiMute.Enabled = false;
+                    _chkHeadphoneTrap.Enabled = false;
+                    _chkAutoLockOnArm.Enabled = false;
+                    _chkAutoLockOnTrigger.Enabled = false;
+                    _chkAutoDisarmOnWinUnlock.Enabled = false;
+                    if (_iconArmed != null)
+                    {
+                        Icon = _iconArmed;
+                        _trayIcon.Icon = _iconArmed;
+                    }
+                    _trayIcon.Text = "CafeGuard: ARMED (Protected)";
+                    _txtPin.Focus();
+                    break;
+
+                case GuardState.AlarmTriggered:
+                    _headerPanel.BackColor = Color.FromArgb(220, 38, 38);
+                    _statusBadgeLabel.Text = "🚨 THEFT ALARM TRIGGERED! 🚨";
+                    _statusSubLabel.Text = $"Trigger: {_triggerReason} — Enter secret PIN to silence siren!";
+                    _btnArmAndLock.Enabled = false;
+                    _btnArmOnly.Enabled = false;
+                    _btnTestSiren.Enabled = false;
+                    _btnDisarm.Enabled = true;
+                    if (_iconAlarm != null)
+                    {
+                        Icon = _iconAlarm;
+                        _trayIcon.Icon = _iconAlarm;
+                    }
+                    _trayIcon.Text = "CafeGuard: 🚨 ALARM TRIGGERED!";
+                    RestoreFromTray();
+                    TopMost = true;
+                    _txtPin.Focus();
+                    break;
+            }
+        }
+
+        private void MinimizeToTray()
+        {
+            Hide();
+            _trayIcon.ShowBalloonTip(
+                1500,
+                "CafeGuard Running in System Tray",
+                _state == GuardState.Disarmed
+                    ? "Right-click the tray icon anytime to Arm & Lock Screen."
+                    : "CafeGuard is actively guarding your laptop in the background.",
+                ToolTipIcon.Info);
+        }
+
+        private void RestoreFromTray()
+        {
+            Show();
+            WindowState = FormWindowState.Normal;
+            BringToFront();
+            Activate();
+        }
+
+        private void Log(string message)
+        {
+            string line = $"[{DateTime.Now:HH:mm:ss}] {message}";
+            _logBox.Items.Insert(0, line);
+            if (_logBox.Items.Count > 100)
+            {
+                _logBox.Items.RemoveAt(_logBox.Items.Count - 1);
+            }
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            // Prevent a thief from closing the window with Alt+F4 or clicking 'X' while Armed or Alarming!
+            if (_state != GuardState.Disarmed && e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                Log("⚠️ Blocked window close attempt while Armed! Enter PIN to disarm first.");
+                if (_state == GuardState.Armed)
+                {
+                    MinimizeToTray();
+                }
+                return;
+            }
+
+            base.OnFormClosing(e);
+        }
+
+        private void ExitApplication()
+        {
+            SystemEvents.SessionSwitch -= SystemEvents_SessionSwitch;
+            _monitorTimer.Stop();
+            _siren.Dispose();
+            PowerAndLockService.SetKeepAwakeOnLockScreen(false);
+            _trayIcon.Visible = false;
+            _trayIcon.Dispose();
+            Application.Exit();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                SystemEvents.SessionSwitch -= SystemEvents_SessionSwitch;
+                _monitorTimer?.Dispose();
+                _testSirenTimer?.Dispose();
+                _siren?.Dispose();
+                _trayIcon?.Dispose();
+                _trayMenu?.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+    }
+}

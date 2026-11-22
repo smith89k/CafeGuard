@@ -1,0 +1,9 @@
+# Build output (rebuilt by Build-Store.bat / windows\run-tests.bat) — no .exe or .msix in the repo
+bin/
+obj/
+dist/
+*.user
+.vs/
+
+# Local working files (previews, task ledgers)
+.superpowers/

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>CafeGuard</AssemblyName>
+    <RootNamespace>CafeGuard</RootNamespace>
+    <Version>1.0.0</Version>
+    <ApplicationIcon>..\CafeGuard.Shared\cafeguard.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+
+  <!-- Publish (Build-Installer.bat passes -r win-x64): one framework-dependent CafeGuard.exe. -->
+  <PropertyGroup>
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CafeGuard.Shared\CafeGuard.Shared.csproj" />
+    <InternalsVisibleTo Include="CafeGuard.Tests" />
+    <!-- WinForms + WPF both define Point/Size/Color: keep System.Drawing out of the automatic usings. -->
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+</Project>
