@@ -7,7 +7,7 @@ $shape = @(@(0.50,0.00), @(1.00,0.18), @(0.92,0.62), @(0.50,1.00), @(0.08,0.62),
 $green = [System.Drawing.ColorTranslator]::FromHtml('#16A34A')
 $red = [System.Drawing.ColorTranslator]::FromHtml('#DC2626')
 
-function Save-Shield([string]$name, [int]$width, [int]$height, [double]$shieldFraction) {
+function Save-Shield([string]$name, [int]$width, [int]$height, [double]$shieldFraction, [string]$dir = $outDir) {
     $bmp = New-Object System.Drawing.Bitmap $width, $height
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = 'AntiAlias'
@@ -20,7 +20,7 @@ function Save-Shield([string]$name, [int]$width, [int]$height, [double]$shieldFr
     $g.SetClip((New-Object System.Drawing.RectangleF ([float]($width / 2)), 0, ([float]($width / 2)), ([float]$height)))
     $g.FillPolygon((New-Object System.Drawing.SolidBrush $red), [System.Drawing.PointF[]]$pts)
     $g.ResetClip()
-    $path = Join-Path $outDir $name
+    $path = Join-Path $dir $name
     $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
     $g.Dispose(); $bmp.Dispose()
     "Wrote $path"
@@ -30,3 +30,8 @@ Save-Shield "Square44x44Logo.png"   44  44  0.86
 Save-Shield "Square150x150Logo.png" 150 150 0.60
 Save-Shield "Wide310x150Logo.png"   310 150 0.60
 Save-Shield "StoreLogo.png"         50  50  0.86
+
+# Logo for the README on GitHub
+$docsImages = Join-Path $PSScriptRoot "..\docs\images"
+New-Item -ItemType Directory -Force $docsImages | Out-Null
+Save-Shield "logo.png" 256 256 0.92 $docsImages

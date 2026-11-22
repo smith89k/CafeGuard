@@ -1,109 +1,136 @@
-# 🛡️ Cafe Guard
+<p align="center">
+  <img src="docs/images/logo.png" alt="Cafe Guard logo" width="112">
+</p>
 
-**A loud alarm that protects your laptop while you step away at the café.**
+<h1 align="center">Cafe Guard</h1>
 
-Alone at a coffee shop and need the bathroom? Click the shield near the clock and turn Cafe Guard **ON**.
-If anyone unplugs the charger, closes the lid, tries to shut the laptop down, or opens Task Manager,
-a siren (and, if you like, a voice) plays at **full volume** — and the mute and volume keys don't stop it.
-When you come back, click **Turn OFF**: Windows asks for your PIN or fingerprint, so only you can stop it.
+<p align="center">
+  <b>A loud alarm that protects your laptop while you step away at the café.</b>
+</p>
 
-![Cafe Guard is ON](docs/store/screenshots/screenshot-2-on.png)
+<p align="center">
+  <a href="https://apps.microsoft.com/detail/9N8FHQ4X67LN?referrer=appbadge&mode=direct">
+    <img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Get it from Microsoft" width="200">
+  </a>
+</p>
 
-- **Free**, no account, no internet, no data collected
-- Windows 10 (2004 or later) and Windows 11, on laptops
-- Microsoft Store: **in review** — [Store page](https://apps.microsoft.com/detail/9N8FHQ4X67LN) (works once approved)
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white" alt="Windows 10 | 11">
+  <img src="https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet&logoColor=white" alt=".NET 8">
+  <img src="https://img.shields.io/badge/price-free-16A34A" alt="Free">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-16A34A" alt="MIT license"></a>
+</p>
+
+<p align="center">
+  <img src="docs/store/screenshots/screenshot-2-on.png" alt="Cafe Guard guarding a laptop" width="820">
+</p>
 
 ---
 
-## How to use it
+## Overview
 
-1. **Plug in your charger.** Cafe Guard watches it, so it needs to be plugged in to turn ON.
-2. **Click the shield** near the clock (if you don't see it, click **^** and drag it onto the taskbar).
-3. Click **🔒 Turn ON — going to bathroom.** The shield turns solid green.
-4. When you're back, click **🔓 Turn OFF — I'm back** and confirm with your Windows PIN or fingerprint.
+Working alone at a coffee shop and need a break? Turn Cafe Guard **ON** from the shield next to the clock and walk away.
+If anyone unplugs the charger, closes the lid, tries to shut the laptop down or opens Task Manager, Cafe Guard sounds a
+siren and a spoken warning at **full volume** — and the mute and volume keys can't stop it. When you return, turn it
+**OFF** with your Windows PIN or fingerprint. Nobody else can.
 
-The shield tells you the state at a glance — two colors only:
+> **Microsoft Store:** Cafe Guard is currently in certification. The badge above opens its Store page once it is published.
 
-| Shield | Meaning |
+## Features
+
+- **One click** to turn ON and OFF from the system tray
+- **Siren, voice, or both** — choose the words and a man's or woman's voice
+- **Owner-only shutdown** — turning OFF requires Windows Hello (PIN, fingerprint or face)
+- **Tamper detection** — charger, lid, sleep, shutdown, headphone jack and Task Manager
+- **Lock-screen protection** — optionally hide the lock-screen power button; optionally turn ON automatically with **Win+L**
+- **Light and dark** themes that follow Windows
+- **Private by design** — no account, no internet connection, no data collected
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/store/screenshots/card-off.png" alt="Cafe Guard OFF" width="260"><br><sub><b>OFF</b> — ready, all checks green</sub></td>
+    <td align="center" width="33%"><img src="docs/store/screenshots/card-on.png" alt="Cafe Guard ON" width="260"><br><sub><b>ON</b> — guarding your laptop</sub></td>
+    <td align="center" width="33%"><img src="docs/store/screenshots/card-alarm.png" alt="Cafe Guard alarm" width="260"><br><sub><b>ALARM</b> — siren and voice at full volume</sub></td>
+  </tr>
+</table>
+
+## How it works
+
+| While ON, if someone… | Cafe Guard… |
+|---|---|
+| unplugs the charger | sounds the alarm |
+| closes the lid | sounds the alarm — the laptop stays awake |
+| tries to sleep or shut down | sounds the alarm and blocks it |
+| plugs headphones into the laptop's jack | sounds the alarm and keeps the sound on the speakers |
+| opens Task Manager | sounds the alarm; a normal **End task** is refused |
+
+During an alarm, a red card stays on top of the screen until the owner turns Cafe Guard **OFF**.
+Bluetooth or USB earbuds that connect by themselves never cause an alarm — the sound simply moves back to the speakers.
+
+| Shield | State |
 |---|---|
 | Green outline | OFF |
 | Solid green | ON — guarding |
 | Blinking red | ALARM |
 
-### What sets off the alarm (while ON)
+## Getting started
 
-| Someone… | Cafe Guard… |
-|---|---|
-| unplugs the charger | sounds the alarm |
-| closes the lid | sounds the alarm (the laptop does **not** go to sleep) |
-| tries to sleep or shut down | sounds the alarm and blocks it |
-| plugs headphones into the laptop's jack | sounds the alarm and keeps the sound on the speakers |
-| opens Task Manager | sounds the alarm (a normal "End task" is also refused) |
+1. Install Cafe Guard from the **[Microsoft Store](https://apps.microsoft.com/detail/9N8FHQ4X67LN)**. It starts with Windows automatically.
+2. Plug in your charger and click the **shield** next to the clock (click **^** first if it's hidden).
+3. Click **Turn ON — going to bathroom**.
+4. When you're back, click **Turn OFF — I'm back** and confirm with your PIN or fingerprint.
 
-During an alarm the red card pops up on top of everything and stays there until you turn Cafe Guard OFF with your PIN.
-Bluetooth or USB earbuds that connect by themselves don't cause an alarm — the sound is simply moved back to the speakers.
+> **Before uninstalling:** if you hid the lock-screen power button, click **Show** on the card first.
+> Windows doesn't let Store apps undo system changes when they are removed.
 
-### Options on the card
+## Limitations
 
-| Option | What it does |
-|---|---|
-| **🔊 Alarm sound** | **Siren**, **Voice** or **Both**. Pick the words — "Don't touch my laptop!", "Please put the laptop down.", and more — and a man's or woman's voice. |
-| **🔐 Turn ON when I lock (Win+L)** | Locking Windows turns the guard ON by itself; unlocking turns it OFF. |
-| **⏻ Lock-screen power button — Hide / Show** | Hides the power button on the lock screen, so nobody can shut down a locked laptop without your password. Windows asks for permission. Click **Show** to put it back — do this **before uninstalling**, because Windows doesn't let Store apps undo changes when they are uninstalled. |
-| **Auto · ☀ · 🌙** | Light or dark look (Auto follows Windows). |
-| **🔊 Test siren** | Plays your alarm sound for 7 seconds (turn your volume down first!). |
-
-### Honest limits
-
-No app can beat these, so it's good to know them:
-
-- Holding the power button for about 5 seconds forces any laptop off.
-- On an **administrator** account, Task Manager runs with full rights and can still close Cafe Guard — but only after the alarm has gone off. For the strongest protection, press **Win+L** before you leave: nobody can reach Task Manager on the lock screen.
-- If Cafe Guard isn't running, nothing is guarded. It starts with Windows by itself (you can turn that off in **Settings → Apps → Startup**).
-
----
+- Holding the power button for about five seconds forces any laptop off.
+- On an administrator account, Task Manager can still close Cafe Guard — but only after the alarm has gone off.
+  For the strongest protection, also press **Win+L** before you leave.
+- Cafe Guard only guards while it is running.
 
 ## Privacy
 
-Cafe Guard does not collect, store or send any personal information and never connects to the internet.
-Your settings and a small activity log stay on your computer. When you turn it OFF, **Windows** checks your PIN or
-fingerprint — Cafe Guard never sees them, only a yes or no. The spoken warning is made on your computer by Windows'
-built-in voices.
+Cafe Guard does not collect, store or transmit personal information and never connects to the internet.
+Settings and a small activity log stay on your computer. Windows verifies your PIN or fingerprint — Cafe Guard never
+sees them. The spoken warning is generated locally by Windows' built-in voices.
 
----
+## Building from source
 
-## Build it yourself
-
-You need Windows 10/11, the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) and the
-[Windows SDK](https://developer.microsoft.com/windows/downloads/windows-sdk/) (for `makeappx.exe`).
+**Requirements:** Windows 10/11, [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0),
+[Windows SDK](https://developer.microsoft.com/windows/downloads/windows-sdk/).
 
 ```bat
-windows\run-tests.bat          :: run the automatic tests
-Build-Store.bat                :: build dist\store\CafeGuard_<version>_x64.msix
-Store-Test.bat install         :: install that package on this PC (needs Developer Mode)
-Store-Test.bat remove          :: uninstall it again
+windows\run-tests.bat        :: run the test suite
+Build-Store.bat              :: build dist\store\CafeGuard_<version>_x64.msix
+Store-Test.bat install       :: install the package locally (requires Developer Mode)
+Store-Test.bat remove        :: uninstall it
 ```
 
-To publish your own build in the Microsoft Store, put your Partner Center identity in
-`windows/CafeGuard.Store/store-identity.json` — see [docs/store/partner-center-guide.md](docs/store/partner-center-guide.md).
+To publish your own build, set your Partner Center identity in `windows/CafeGuard.Store/store-identity.json`.
+See the [Store submission guide](docs/store/partner-center-guide.md).
 
-Log file: `%LOCALAPPDATA%\CafeGuard\cafeguard.log` · Settings: `%LOCALAPPDATA%\CafeGuard\settings.json`
+<details>
+<summary><b>Project structure</b></summary>
 
-### Project layout
-
-| Folder | What's in it |
+| Path | Contents |
 |---|---|
-| `windows/CafeGuard/` | The tray app (.NET 8, WinForms + WPF): guard logic, alarm sound, the pop-up card |
-| `windows/CafeGuard.Shared/` | Look and feel (green palette, styles, shield), settings, paths, registry helpers |
-| `windows/CafeGuard.Store/` | Microsoft Store package description, logos and identity |
-| `windows/CafeGuard.Tests/` | Automatic tests (xUnit) |
-| `tools/` | Build scripts and the scripts that draw the icons and Store screenshots |
-| `docs/` | Store submission guide, screenshots, design notes |
-| `macos/` | An early, separate Mac version (Python) — not tested on a real Mac yet |
-| `archive/` | Old versions, kept for reference |
+| `windows/CafeGuard/` | Tray app (.NET 8, WinForms + WPF): guard logic, alarm sound, pop-up card |
+| `windows/CafeGuard.Shared/` | Theme, styles, settings, paths and registry helpers |
+| `windows/CafeGuard.Store/` | MSIX manifest template, logos and Store identity |
+| `windows/CafeGuard.Tests/` | xUnit test suite |
+| `tools/` | Build scripts; icon, logo and screenshot generators |
+| `docs/` | Store guide, screenshots, design notes |
+| `macos/` | Early experimental Mac version (Python, untested) |
+| `archive/` | Earlier versions, for reference |
 
----
+Logs: `%LOCALAPPDATA%\CafeGuard\cafeguard.log` · Settings: `%LOCALAPPDATA%\CafeGuard\settings.json`
+
+</details>
 
 ## License
 
-[MIT](LICENSE) © 2026 Taing Sunnguon
+Released under the [MIT License](LICENSE). © 2026 Taing Sunnguon
