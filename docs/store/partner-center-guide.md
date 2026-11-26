@@ -31,7 +31,16 @@ Everything here is done by you, in your own Microsoft account. The build files a
 
 ### Why CafeGuard needs `runFullTrust`
 
-> CafeGuard is a classic Windows desktop app (WinForms/WPF). It shows a notification-area (tray) icon and reads the charger/battery state. To sound the alarm, it sets the system volume through Core Audio. While the guard is ON, it temporarily sets the lid-close and power-button actions to "Do nothing" and blocks shutdown, so a thief can't silence the alarm. These settings are restored when the guard is turned OFF.
+> CafeGuard is a classic Windows desktop app (WinForms/WPF) and an anti-theft alarm for laptops. It needs full trust for these desktop features, which have no sandboxed equivalent:
+>
+> - A notification-area (tray) icon, which is how the user turns the guard ON and OFF.
+> - Reading the charger, lid and sleep/shutdown events, so it knows when someone tampers with the laptop.
+> - Setting the system volume and the default speaker through Core Audio, so the siren plays at full volume and plugged-in headphones can't silence it.
+> - While the guard is ON, temporarily setting the lid-close and power-button actions to "Do nothing" and blocking shutdown, so a thief can't silence the alarm.
+> - Noticing when Task Manager opens, and refusing a normal "End task" on its own process only. An administrator can still end it.
+> - Asking for Windows Hello (PIN, fingerprint or face) before the guard turns OFF.
+>
+> All of these settings are put back when the guard is turned OFF. CafeGuard uses no internet connection and collects no data.
 
 ### Why CafeGuard needs `allowElevation`
 
@@ -58,6 +67,57 @@ Everything here is done by you, in your own Microsoft account. The build files a
 ### Privacy statement (only if asked)
 
 > CafeGuard does not collect, store, or send any personal information. It does not connect to the internet. Its settings and log stay on your computer.
+
+## 4a. Asking Microsoft again for `allowElevation`
+
+Microsoft denied it on 2026-11-26 (report: "10.6.3 Capabilities") and asked for new, longer reasons. The restricted-capabilities box only takes 500 characters, so the short text goes there and the long one goes in **Additional Testing Information** (Notes for certification).
+
+Short text (restricted capabilities box):
+
+```text
+Reconsideration, new info in Notes for certification. Anti-theft alarm: the lock-screen power button lets a thief shut down a locked laptop and silence it. Windows only hides it via HKLM policy shutdownwithoutlogon; no per-user setting or API exists. Elevates only when the user clicks optional Hide/Show, UAC each time; writes or restores only that value, then exits. We assure it is used only for this and writes only that path. Support: https://github.com/smith89k/CafeGuard/issues
+```
+
+Long text (Additional Testing Information):
+
+```text
+Cafe Guard - request to reconsider the restricted capability allowElevation (new and expanded information)
+
+1. WHY THE PRODUCT NEEDS IT
+Cafe Guard is an anti-theft alarm for people working alone in a cafe who step away from their laptop for a moment. While the guard is ON, the laptop is locked. The Windows lock screen shows a power button that lets anyone shut the laptop down without a password. Shutting down ends the alarm at once, which defeats the whole product. Hiding that button is the most important extra protection a user can add.
+
+What we explored before choosing elevation:
+- A per-user setting (HKCU): none exists. Windows reads this only from the machine-wide policy value HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\shutdownwithoutlogon.
+- A Windows API or a Settings page: none exists for hiding the lock-screen power button.
+- Blocking shutdown from inside the app: Cafe Guard already asks Windows to block shutdown while the guard is ON, but that request can be overridden, and the lock-screen button still gives a stranger a one-click way to try.
+- Asking users to change Group Policy themselves: the Group Policy Editor is not available on Windows Home, and editing the registry by hand is risky for non-technical users.
+Writing this one policy value is the only supported way, and it requires administrator rights.
+
+2. THE EXACT FEATURE THAT USES IT
+On the app's tray card there is a row "Lock-screen power button: Visible - Hide". The "Hide" link is optional and off by default. Everything else in the app works without it.
+
+3. LEAST PRIVILEGE
+- The app never runs elevated at launch. It always runs as a normal user.
+- Elevation happens only when the user clicks "Hide" or "Show". The app uses ShellExecute with "runas", so Windows shows the UAC prompt every single time. If the user clicks No, nothing changes.
+- The elevated process is Cafe Guard itself, started with one fixed command: --set-lockscreen-power hide | show | restore:N | restore:none. It shows no window, writes or restores that single value, and exits immediately.
+- It touches no other registry key, file, service, driver or setting.
+
+4. SAFEGUARDS AGAINST MISUSE OR HARM
+- Before hiding the button, the app saves the previous value in the user's own app data folder. "Show" puts back exactly that value, or removes the value if it did not exist before.
+- If the button was already hidden by someone else (for example an IT administrator), the app does not change it and never offers to undo it.
+- The Store description tells users to click "Show" before uninstalling, because MSIX apps cannot run code on uninstall.
+- No network access, no data collected, no background service.
+- The full source code is public, so anyone can check this: https://github.com/smith89k/CafeGuard
+
+5. SUPPORT CONTACT / DEVELOPER WEBSITE
+https://github.com/smith89k/CafeGuard (support: https://github.com/smith89k/CafeGuard/issues)
+
+6. STATEMENT OF ASSURANCE
+We confirm that allowElevation is used only for the purpose described above, and that the elevated process writes only to HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System, value shutdownwithoutlogon, and nowhere else.
+
+HOW TO TEST
+Click the shield icon near the clock to open the card. Next to "Lock-screen power button", click "Hide" and approve the UAC prompt. Press Win+L: the power button is gone from the lock screen. Unlock, click "Show", approve UAC, and the button is back.
+```
 
 ## 4. If Microsoft says no to `allowElevation`
 
