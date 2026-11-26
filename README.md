@@ -1,22 +1,6 @@
-<div align="center">
-
-<img src="art/logo.svg" width="112" height="112" alt="Cafe Guard logo">
-
-# Cafe Guard
-
-**A loud alarm that guards your laptop while you step away from the table. Only Windows Hello turns it off.**
-
-<a href="https://github.com/smith89k/CafeGuard/blob/main/LICENSE"><img src="https://img.shields.io/github/license/smith89k/CafeGuard" alt="Licence"></a>
-<img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4" alt="Windows 10 or 11">
-<img src="https://img.shields.io/badge/unlock-Windows%20Hello-C96B10" alt="Windows Hello">
-<img src="https://img.shields.io/badge/Microsoft%20Store-Cafe%20Guard-0078d4" alt="Microsoft Store">
-
-</div>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="art/banner-dark.png">
-  <img src="art/banner-light.png" alt="Cafe Guard: a laptop with the guard armed, and an alert showing the siren firing when the charger is unplugged." width="100%">
-</picture>
+<p align="center">
+  <img src="art/logo.svg" width="112" height="112" alt="Cafe Guard logo">
+</p>
 
 <h1 align="center">Cafe Guard</h1>
 
@@ -36,6 +20,11 @@
   <img src="https://img.shields.io/badge/price-free-16A34A" alt="Free">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-16A34A" alt="MIT license"></a>
 </p>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="art/banner-dark.png">
+  <img src="art/banner-light.png" alt="Cafe Guard: a laptop with the guard armed, and an alert showing the siren firing when the charger is unplugged." width="100%">
+</picture>
 
 <p align="center">
   <img src="docs/store/screenshots/screenshot-2-on.png" alt="Cafe Guard guarding a laptop" width="820">
