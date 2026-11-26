@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="art/logo.svg" width="112" height="112" alt="Cafe Guard logo">
+  <img src="docs/images/logo.png" width="112" height="112" alt="Cafe Guard logo">
 </p>
 
 <h1 align="center">Cafe Guard</h1>
