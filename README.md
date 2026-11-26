@@ -26,10 +26,6 @@
   <img src="art/banner-light.png" alt="Cafe Guard: a laptop with the guard armed, and an alert showing the siren firing when the charger is unplugged." width="100%">
 </picture>
 
-<p align="center">
-  <img src="docs/store/screenshots/screenshot-2-on.png" alt="Cafe Guard guarding a laptop" width="820">
-</p>
-
 ---
 
 ## Overview
@@ -52,6 +48,10 @@ siren and a spoken warning at **full volume** — and the mute and volume keys c
 - **Private by design** — no account, no internet connection, no data collected
 
 ## Screenshots
+
+<p align="center">
+  <img src="docs/store/screenshots/screenshot-2-on.png" alt="Cafe Guard guarding a laptop" width="820">
+</p>
 
 <table>
   <tr>
